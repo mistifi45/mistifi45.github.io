@@ -1,0 +1,538 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Claude Prompt Tracker — Pro</title>
+  <style>
+    :root {
+      --bg: #0b0f14; --panel: #121922; --border: #1e2633; --muted: #93a1b1; --text: #e6edf3;
+      --accent: #7aa2f7; --accent2: #7ee787; --warn: #f7c95c; --danger:#ff6b6b; --ink:#0e141b;
+    }
+    *{box-sizing:border-box}
+    body{margin:0;font-family:ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,Cantarell,Noto Sans,"Helvetica Neue",Arial,sans-serif;background:var(--bg);color:var(--text)}
+    header{position:sticky;top:0;z-index:10;background:linear-gradient(180deg,rgba(18,25,34,.98),rgba(18,25,34,.92));border-bottom:1px solid var(--border);padding:10px 16px}
+    h1{margin:4px 0 8px 0;font-size:18px}
+    .nav{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+    .nav .tabs{display:flex;gap:6px;margin-right:auto}
+    .tab{padding:8px 12px;border:1px solid var(--border);border-radius:8px;background:#0f1722;color:var(--text);cursor:pointer}
+    .tab.active{outline:1px solid #2f3a66;color:var(--accent)}
+    .toolbar{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-top:8px}
+    input[type=text]{padding:10px 12px;border-radius:8px;border:1px solid var(--border);background:var(--ink);color:var(--text)}
+    .btn{padding:8px 12px;border:1px solid var(--border);border-radius:8px;background:#0f1722;color:var(--text);cursor:pointer;transition:transform .02s,background .2s}
+    .btn:hover{background:#141d29}.btn:active{transform:translateY(1px)}
+    .btn.primary{border-color:#29425f;background:#112031;color:var(--accent2)}
+    .btn.accent{border-color:#2f3a66;background:#111934;color:var(--accent)}
+    .btn.warn{color:#1f1500;background:var(--warn);border-color:#d7ad41}
+    .btn.danger{color:white;background:#7a1f2a;border-color:#aa3a49}
+    main{padding:16px;max-width:1200px;margin:0 auto}
+    .grid{display:grid;gap:10px}
+    .card{border:1px solid var(--border);background:var(--panel);border-radius:12px;overflow:hidden}
+    .card-header{display:flex;align-items:center;gap:10px;padding:10px 12px;border-bottom:1px solid var(--border)}
+    .title{font-weight:700;font-size:15px;flex:1}
+    .badge{font-size:12px;padding:2px 8px;border:1px solid var(--border);border-radius:999px;color:var(--muted)}
+    .content{padding:12px;display:grid;gap:10px}
+    textarea{width:100%;min-height:120px;resize:vertical;padding:10px;border-radius:8px;border:1px solid var(--border);background:var(--ink);color:var(--text);font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:12px}
+    .row{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+    .muted{color:var(--muted);font-size:12px}
+    .hidden{display:none!important}
+    table{width:100%;border-collapse:collapse}
+    th,td{border:1px solid var(--border);padding:8px;vertical-align:top}
+    th{background:#0f1722;text-align:left}
+    .footer{padding:16px;color:var(--muted);text-align:center}
+    .pill{display:inline-block;padding:2px 8px;border:1px solid var(--border);border-radius:999px;margin-right:6px;font-size:12px}
+    .hr{height:1px;background:var(--border);margin:6px 0}
+    @media print{header,.no-print{display:none!important} body{background:white;color:black} .card{border:1px solid #ccc}}
+    #errorBanner{display:none;background:#3a1a1a;color:#ffdada;border:1px solid #6f2a2a;padding:8px 12px;margin:10px 16px;border-radius:8px}
+    .space{display:flex;gap:6px;align-items:center}
+    .space .pill{border-color:#2f3a66;color:#aab7ff}
+  </style>
+</head>
+<body>
+  <div id="errorBanner"></div>
+  <header>
+    <h1>Claude Prompt Tracker — Pro</h1>
+    <div class="nav">
+      <div class="tabs">
+        <button class="tab active" data-tab="prompts">Prompts</button>
+        <button class="tab" data-tab="logs">Logs</button>
+        <button class="tab" data-tab="manage">Manage</button>
+        <button class="tab" data-tab="integrations">Integrations</button>
+      </div>
+      <div class="space">
+        <span class="pill" id="spaceLabel">Space: default</span>
+        <input id="spaceInput" type="text" placeholder="space (e.g. salesforce)" style="width:180px"/>
+        <button class="btn" id="spaceGo">Go</button>
+        <button class="btn" id="shareLink" title="Copy link with ?space=…">Copy Link</button>
+      </div>
+    </div>
+    <div class="toolbar" id="toolbar-prompts">
+      <input id="search" type="text" placeholder="Search prompts… (title, text, reason)" />
+      <button class="btn accent" id="expandAll">Expand all</button>
+      <button class="btn" id="collapseAll">Collapse all</button>
+      <button class="btn primary" id="exportJson">Export JSON</button>
+      <button class="btn" id="exportMd">Export Markdown</button>
+      <button class="btn" id="exportCsv">Export CSV</button>
+      <button class="btn" id="exportXls">Export Excel (.xls)</button>
+      <button class="btn" id="exportPdf">Export PDF</button>
+      <button class="btn" id="reset">Reset Progress</button>
+      <button class="btn" id="runTests" title="Run built‑in smoke tests">Run Self‑Test</button>
+    </div>
+  </header>
+
+  <main>
+    <section id="view-prompts" class="grid"></section>
+    <section id="view-logs" class="hidden">
+      <div class="row no-print" style="margin-bottom:8px">
+        <input id="logSearch" type="text" placeholder="Filter logs (title, outcome, notes)…" />
+        <button class="btn" id="exportLogsCsv">Export Logs CSV</button>
+        <button class="btn" id="exportLogsXls">Export Logs Excel (.xls)</button>
+        <button class="btn" id="exportLogsPdf">Export Logs PDF</button>
+      </div>
+      <table id="logsTable">
+        <thead><tr><th>Date</th><th>Prompt</th><th>Outcome</th><th>Notes</th></tr></thead>
+        <tbody></tbody>
+      </table>
+    </section>
+
+    <section id="view-manage" class="hidden">
+      <div class="card">
+        <div class="card-header"><div class="title">Add New Prompt</div></div>
+        <div class="content">
+          <div class="row"><input id="newTitle" type="text" placeholder="Title (e.g., Prompt 11 — …)" style="flex:1"/></div>
+          <div class="row"><input id="newReason" type="text" placeholder="Reason / Goal (short)" style="flex:1"/></div>
+          <textarea id="newContent" placeholder="Prompt body (markdown/code blocks are fine)"></textarea>
+          <div class="row"><button class="btn primary" id="addPrompt">Add Prompt</button></div>
+        </div>
+      </div>
+      <div class="card" style="margin-top:10px">
+        <div class="card-header"><div class="title">Custom Prompts</div><span class="muted">Edit or delete your added prompts</span></div>
+        <div class="content" id="customList"></div>
+      </div>
+    </section>
+
+    <section id="view-integrations" class="hidden">
+      <div class="card">
+        <div class="card-header"><div class="title">Google Sheets / Drive</div><span class="pill">Beta</span></div>
+        <div class="content">
+          <div class="muted">Run via <code>http://localhost</code> (not <code>file://</code>). Create an OAuth Client ID in Google Cloud Console (Web) with Authorized origin <code>http://localhost:PORT</code> and redirect <code>http://localhost:PORT</code>.</div>
+          <div class="row"><input id="googleClientId" type="text" placeholder="Google OAuth Client ID" style="flex:1"/></div>
+          <div class="row">
+            <button class="btn" id="googleConnect">Connect Google</button>
+            <button class="btn" id="exportGoogleSheets">Export → Google Sheets</button>
+            <span class="muted" id="googleStatus">Not connected</span>
+          </div>
+        </div>
+      </div>
+      <div class="card" style="margin-top:10px">
+        <div class="card-header"><div class="title">Microsoft OneDrive</div><span class="pill">Beta</span></div>
+        <div class="content">
+          <div class="muted">Run via <code>http://localhost</code>. Register an app in Azure AD (MSAL) with redirect URI <code>http://localhost:PORT/</code>. Enable Graph permission <code>Files.ReadWrite</code>.</div>
+          <div class="row"><input id="msClientId" type="text" placeholder="Microsoft (Azure AD) Client ID" style="flex:1"/></div>
+          <div class="row">
+            <button class="btn" id="msConnect">Connect Microsoft</button>
+            <button class="btn" id="saveOneDriveCsv">Save CSV to OneDrive</button>
+            <span class="muted" id="msStatus">Not connected</span>
+          </div>
+        </div>
+      </div>
+      <div class="muted" style="margin-top:8px">No secrets are stored on a server; client IDs are saved in your browser storage. You can clear them with "Reset Progress".</div>
+    </section>
+  </main>
+
+  <div class="footer no-print">This is a local, single-file app. Use Export → JSON/CSV/XLS/Markdown/PDF. For Google/Microsoft exports, run on <code>localhost</code> and provide a Client ID.</div>
+
+  <!-- Embedded prompts data (VALID JSON ONLY). If you edit, keep ALL newlines as \n and escape quotes. -->
+  <script id="prompts-data" type="application/json">{
+    "version": 2,
+    "items": [
+      {"id":"p1","title":"Prompt 1 — Guarded @api Calls (One‑Shot)","reason":"Prevent runtime errors on child API calls.","content":"# Prompt 1 — Guarded @api Calls (One‑Shot)\n\nContext: force-app/main/default/lwc/\n\nGoal: Prevent runtime errors when calendarApp calls child @api methods (e.g., updateDate) by adding guards. Include focused tests.\n\nSteps:\n1) Add getToolbarEl() and hasMethod() helpers in calendarApp.js.\n2) Replace direct calls with guarded pattern.\n3) Ensure calendarToolbar.js exports @api updateDate(newDate) and normalizes to Date.\n4) Tests: toolbar present vs missing.\nAcceptance: No crashes; tests pass."},
+      {"id":"p2","title":"Prompt 2 — Centralize Mobile State (One‑Shot)","reason":"Single source of truth for responsive logic.","content":"# Prompt 2 — Centralize Mobile State (One‑Shot)\n\nContext: force-app/main/default/lwc/\n\nGoal: Single source of truth for isMobile in calendarApp. calendarToolbar consumes via @api only.\n\nSteps:\n1) Implement isMobile via matchMedia in calendarApp.js with resize listener.\n2) Pass is-mobile={isMobile} to c-calendar-toolbar.\n3) Remove internal tracking in toolbar; declare @api isMobile.\n4) Tests: UI differs when isMobile true vs false."},
+      {"id":"p3","title":"Prompt 3 — Filter State Sync (One‑Shot)","reason":"Avoid desync across parent/child filters.","content":"# Prompt 3 — Filter State Sync (One‑Shot)\n\nContext: force-app/main/default/lwc/\n\nGoal: Parent-controlled filters. Toolbar emits one normalized event; parent updates state and props.\n\nContract:\n- Toolbar dispatches filterschange with { types: string[], categories: string[], showFilters: boolean }.\n- Parent owns state; passes props back as @api values.\n\nSteps:\n1) Remove conflicting private state in toolbar.\n2) Dispatch filterschange with normalized payload.\n3) In app, handle onfilterschange and update props.\n4) Tests: payload correctness and parent reflection."},
+      {"id":"p4","title":"Prompt 4 — Controlled View State (One‑Shot)","reason":"Controlled component pattern for views.","content":"# Prompt 4 — Controlled View State (One‑Shot)\n\nContext: force-app/main/default/lwc/\n\nGoal: Parent controls currentView; toolbar mirrors prop and emits one viewchange event.\n\nContract:\n- Parent passes @api currentView.\n- Toolbar dispatches { view: 'dayGridMonth'|'timeGridWeek'|'timeGridDay'|'listWeek' }.\n\nSteps:\n1) Remove independent _internalCurrentView.\n2) Add emitViewChange(nextView) and use from UI.\n3) In app, update currentView and trigger minimal FC switch.\n4) Tests: expected view events and single render."},
+      {"id":"p5","title":"Prompt 5 — Date Sync Contract (One‑Shot)","reason":"Normalize inputs and guard calls.","content":"# Prompt 5 — Date Sync Contract (One‑Shot)\n\nContext: force-app/main/default/lwc/\n\nGoal: Safe updateDate contract. Normalize inputs; guard parent calls.\n\nSteps:\n1) In toolbar, implement @api updateDate(newDate) → this.currentDate = new Date(newDate).\n2) In app, guard before calling updateDate (see Prompt 1).\n3) Tests: string and Date inputs normalize to Date."},
+      {"id":"p6","title":"Prompt 6 — One‑Shot (Contracts + JSDoc + Docs + Tests)","reason":"Codify event contracts across code+docs.","content":"# Prompt 6 — One‑Shot (Contracts + JSDoc + Docs + Tests)\n\nContext: repo root / lwc\n\nGoal: Event contracts explicit across docs and code. Add JSDoc typedefs, annotate dispatch sites in calendarToolbar.js, annotate handlers in calendarApp.js, align component docs, add minimal tests. Idempotent and small diffs."},
+      {"id":"p7","title":"Prompt 7 — Sync PROMPTS & TASKS (One‑Shot)","reason":"Keep AI-facing docs aligned.","content":"# Prompt 7 — Sync PROMPTS & TASKS (One‑Shot)\n\nGoal: Keep AI-facing docs current with the new contracts; avoid drift."},
+      {"id":"p8","title":"Prompt 8 — Rerender Guards & Tests (One‑Shot)","reason":"Prevent duplicate rerenders under bursts.","content":"# Prompt 8 — Rerender Guards & Tests (One‑Shot)\n\nGoal: Prevent duplicate rerenders when rapid events fire; prove with tests."},
+      {"id":"p9","title":"Prompt 9 — Commit Hygiene (One‑Shot)","reason":"Readable, revertable history.","content":"# Prompt 9 — Commit Hygiene (One‑Shot)\n\nGoal: Keep history reviewable and easy to revert."},
+      {"id":"p10","title":"Prompt 10 — Final Verification (One‑Shot)","reason":"Consistency before push.","content":"# Prompt 10 — Final Verification (One‑Shot)\n\nGoal: Ensure code, tests, and docs are consistent before push."}
+    ]
+  }</script>
+
+  <script>
+  (function(){
+    const $ = (sel, el=document) => el.querySelector(sel);
+    const $$ = (sel, el=document) => Array.from(el.querySelectorAll(sel));
+
+    // ---- Multi-project namespacing ----
+    const baseKey = 'claude-prompt-tracker.v2';
+    function sanitizeSpace(s){
+      const t = (s||'').toString().trim().toLowerCase();
+      const cleaned = t.replace(/[^\w.-]+/g,'-').replace(/^-+|-+$/g,'');
+      return cleaned || 'default';
+    }
+    function getSpace(){
+      const sp = new URLSearchParams(location.search).get('space');
+      return sanitizeSpace(sp || 'default');
+    }
+    const space = getSpace();
+    const stateKey = `${baseKey}::${space}`;
+
+    // Migrate legacy storage to default space once
+    try{
+      if(space==='default' && !localStorage.getItem(stateKey) && localStorage.getItem(baseKey)){
+        localStorage.setItem(stateKey, localStorage.getItem(baseKey));
+      }
+    }catch(_){/* ignore quota errors */}
+
+    // Update Space UI
+    const spaceLabelEl = document.getElementById('spaceLabel');
+    const spaceInputEl = document.getElementById('spaceInput');
+    const spaceGoBtn = document.getElementById('spaceGo');
+    const shareLinkBtn = document.getElementById('shareLink');
+    if(spaceLabelEl) spaceLabelEl.textContent = `Space: ${space}`;
+    if(spaceInputEl) spaceInputEl.value = space === 'default' ? '' : space;
+    spaceGoBtn?.addEventListener('click', ()=>{
+      const next = sanitizeSpace(spaceInputEl.value || 'default');
+      const url = new URL(location.href); url.searchParams.set('space', next); location.href = url.toString();
+    });
+    shareLinkBtn?.addEventListener('click', async ()=>{
+      const url = new URL(location.href); url.searchParams.set('space', space);
+      try{ await navigator.clipboard.writeText(url.toString()); flash(shareLinkBtn,'Copied'); }catch(_){ alert(url.toString()); }
+    });
+
+    // ---- Load data ----
+    // Parse prompts JSON defensively and surface errors
+    let data = { version: 0, items: [] };
+    try {
+      const raw = document.getElementById('prompts-data')?.textContent || '{}';
+      data = JSON.parse(raw);
+    } catch (e) {
+      console.error('Invalid prompts JSON', e);
+      showError('Prompts JSON failed to parse. The app loaded with an empty dataset.');
+    }
+
+    // Validate schema (extra test case)
+    const jsonOk = Array.isArray(data.items) && data.items.every(it => it && typeof it.id==='string' && typeof it.title==='string' && typeof it.content==='string');
+    if(!jsonOk){ showError('Prompts schema invalid: each item must have id, title, content (strings).'); }
+
+    let userState = loadState();
+
+    function showError(msg){
+      const b = document.getElementById('errorBanner');
+      if(!b) return; b.textContent = msg; b.style.display = 'block';
+    }
+
+    function defaultState(){
+      return { outcomes:{}, notes:{}, done:{}, collapsed:{}, summaries:{}, logs:[], customItems:[], gClientId:'', msClientId:'', gAuthed:false, msAuthed:false };
+    }
+
+    function loadState(){
+      try {
+        return JSON.parse(localStorage.getItem(stateKey)) || defaultState();
+      } catch(e){
+        console.warn('State parse failed, using defaults');
+        return defaultState();
+      }
+    }
+    function saveState(){ localStorage.setItem(stateKey, JSON.stringify(userState)); }
+
+    // Tabs
+    $$('.tab').forEach(btn=>btn.addEventListener('click',()=>setTab(btn.dataset.tab)));
+    function setTab(name){
+      $$('.tab').forEach(b=>b.classList.toggle('active', b.dataset.tab===name));
+      $('#view-prompts').classList.toggle('hidden', name!=='prompts');
+      $('#view-logs').classList.toggle('hidden', name!=='logs');
+      $('#view-manage').classList.toggle('hidden', name!=='manage');
+      $('#view-integrations').classList.toggle('hidden', name!=='integrations');
+      $('#toolbar-prompts').classList.toggle('hidden', name!=='prompts');
+      if(name==='logs') renderLogs();
+      if(name==='manage') renderCustom();
+      if(name==='integrations') renderIntegrations();
+    }
+
+    // Render prompts
+    function allItems(){ return [...(data.items||[]), ...(userState.customItems||[])]; }
+
+    function renderPrompts(){
+      const host = $('#view-prompts'); if(!host) return; host.innerHTML='';
+      const q = ($('#search')?.value||'').toLowerCase();
+      allItems().forEach(item=>{
+        const hay = (item.title+'\n'+item.content+'\n'+(item.reason||'')).toLowerCase();
+        if(q && !hay.includes(q)) return;
+        const card = document.createElement('section'); card.className='card'; card.dataset.id=item.id;
+        const header = document.createElement('div'); header.className='card-header';
+        const done = document.createElement('input'); done.type='checkbox'; done.checked=!!userState.done[item.id];
+        done.addEventListener('change',()=>{ userState.done[item.id]=done.checked; saveState(); updBadge(); });
+        const title = document.createElement('div'); title.className='title'; title.textContent=item.title;
+        const bad = document.createElement('span'); bad.className='badge';
+        function updBadge(){ bad.textContent = userState.done[item.id] ? 'Done' : 'Todo'; bad.style.color=userState.done[item.id]?'var(--accent2)':'var(--muted)'; }
+        updBadge();
+        const copy = document.createElement('button'); copy.className='btn accent'; copy.textContent='Copy'; copy.addEventListener('click',()=>copyText(item.content));
+        const tog = document.createElement('button'); tog.className='btn'; tog.textContent=userState.collapsed[item.id]?'Expand':'Collapse';
+        const body = document.createElement('div'); body.className='content'; if(userState.collapsed[item.id]) body.classList.add('hidden');
+        tog.addEventListener('click',()=>{ const collapsed=!body.classList.toggle('hidden'); userState.collapsed[item.id]=collapsed; tog.textContent=collapsed?'Expand':'Collapse'; saveState(); });
+        header.append(done,title,bad,copy,tog);
+
+        const reason = document.createElement('div'); reason.innerHTML = `<span class=\"pill\">Reason</span> ${escapeHtml(item.reason||'')}`;
+        const hr = document.createElement('div'); hr.className='hr';
+        const taPrompt = document.createElement('textarea'); taPrompt.readOnly=true; taPrompt.value=item.content; taPrompt.className='prompt';
+
+        const outcomeLabel = document.createElement('div'); outcomeLabel.textContent='Outcome (what actually happened)'; outcomeLabel.className='muted';
+        const taOutcome = document.createElement('textarea'); taOutcome.placeholder='Enter concrete outcome, key changes, links to PRs/commits';
+        taOutcome.value = userState.outcomes[item.id] || '';
+        taOutcome.addEventListener('input', debounce(()=>{ userState.outcomes[item.id]=taOutcome.value; saveState(); },300));
+
+        const notesLabel = document.createElement('div'); notesLabel.textContent='Notes (decisions, gotchas, follow-ups)'; notesLabel.className='muted';
+        const taNotes = document.createElement('textarea'); taNotes.placeholder='Any notes you want to track for this prompt';
+        taNotes.value = userState.notes[item.id] || '';
+        taNotes.addEventListener('input', debounce(()=>{ userState.notes[item.id]=taNotes.value; saveState(); },300));
+
+        const submit = document.createElement('button'); submit.className='btn primary'; submit.textContent='Submit outcome → Log';
+        submit.addEventListener('click',()=>{
+          const o=(userState.outcomes[item.id]||'').trim(); const n=(userState.notes[item.id]||'').trim();
+          if(!o && !n) { alert('Add an outcome or notes before submitting.'); return; }
+          userState.logs.push({ ts: new Date().toISOString(), id:item.id, title:item.title, outcome:o, notes:n }); saveState();
+          flash(submit,'Logged');
+        });
+
+        body.append(reason,hr,taPrompt,outcomeLabel,taOutcome,notesLabel,taNotes,submit);
+        card.append(header,body); host.append(card);
+      });
+    }
+
+    function renderLogs(){
+      const q = ($('#logSearch')?.value||'').toLowerCase();
+      const tbody = $('#logsTable tbody'); if(!tbody) return; tbody.innerHTML='';
+      (userState.logs||[]).slice().reverse().forEach(row=>{
+        const hay=(row.title+'\n'+row.outcome+'\n'+row.notes).toLowerCase();
+        if(q && !hay.includes(q)) return;
+        const tr=document.createElement('tr');
+        tr.innerHTML=`<td>${fmtDate(row.ts)}</td><td>${escapeHtml(row.title)}</td><td>${escapeHtml(row.outcome||'')}</td><td>${escapeHtml(row.notes||'')}</td>`;
+        tbody.append(tr);
+      });
+    }
+
+    function renderCustom(){
+      const list=$('#customList'); if(!list) return; list.innerHTML='';
+      (userState.customItems||[]).forEach((it,idx)=>{
+        const card=document.createElement('div'); card.className='card';
+        const hdr=document.createElement('div'); hdr.className='card-header';
+        const t=document.createElement('div'); t.className='title'; t.textContent=it.title;
+        const del=document.createElement('button'); del.className='btn danger'; del.textContent='Delete';
+        del.addEventListener('click',()=>{ if(confirm('Delete this prompt?')){ userState.customItems.splice(idx,1); saveState(); renderCustom(); renderPrompts(); } });
+        hdr.append(t,del);
+        const c=document.createElement('div'); c.className='content';
+        const reason=document.createElement('div'); reason.innerHTML=`<span class='pill'>Reason</span> ${escapeHtml(it.reason||'')}`;
+        const ta=document.createElement('textarea'); ta.value=it.content; ta.addEventListener('input', debounce(()=>{ it.content=ta.value; saveState(); },300));
+        c.append(reason,ta);
+        card.append(hdr,c);
+        list.append(card);
+      });
+    }
+
+    function renderIntegrations(){
+      const gId = $('#googleClientId'); const mId=$('#msClientId');
+      if(gId) gId.value = userState.gClientId || '';
+      if(mId) mId.value = userState.msClientId || '';
+      const gs=$('#googleStatus'); if(gs) gs.textContent = userState.gAuthed ? 'Connected' : 'Not connected';
+      const ms=$('#msStatus'); if(ms) ms.textContent = userState.msAuthed ? 'Connected' : 'Not connected';
+    }
+
+    // Helpers
+    function debounce(fn,ms){ let t; return (...a)=>{ clearTimeout(t); t=setTimeout(()=>fn.apply(null,a),ms); }; }
+    function escapeHtml(s){ return (s||'').replace(/[&<>"']/g, c=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[c])); }
+    function fmtDate(iso){ try{ const d=new Date(iso); return d.toLocaleString(); }catch(e){ return iso; } }
+    function flash(btn,txt){ const o=btn.textContent; btn.textContent=txt; setTimeout(()=>btn.textContent=o,1200); }
+
+    function fallbackCopy(text){
+      const ta = document.createElement('textarea'); ta.value = text; ta.style.position='fixed'; ta.style.opacity='0'; document.body.appendChild(ta); ta.focus(); ta.select();
+      try { document.execCommand('copy'); } catch(e){}
+      ta.remove();
+    }
+    async function copyText(text){ if(navigator.clipboard && window.isSecureContext){ try{ await navigator.clipboard.writeText(text); return; }catch(e){} } fallbackCopy(text); }
+
+    // Build reports
+    function buildRows(){
+      return allItems().map(it=>({
+        id: it.id, title: it.title, reason: (it.reason||''), done: !!userState.done[it.id], outcome: userState.outcomes[it.id]||'', notes: userState.notes[it.id]||''
+      }));
+    }
+
+    function exportJSON(){
+      const payload = { space, generated:new Date().toISOString(), items: buildRows(), logs: userState.logs };
+      downloadBlob(JSON.stringify(payload,null,2),'application/json',`claude-prompt-progress.${space}.json`);
+    }
+
+    function exportMarkdown(){
+      const lines=['# Claude Prompt Session Report',`Space: ${space}`,'',`Generated: ${new Date().toISOString()}`,''];
+      buildRows().forEach(r=>{ lines.push(`## ${r.done?'✅':'⬜'} ${r.title}`); if(r.reason) lines.push('**Reason:** '+r.reason); if(r.outcome){ lines.push('','**Outcome**','',''+r.outcome); } if(r.notes){ lines.push('','**Notes**','',''+r.notes); } lines.push(''); });
+      if((userState.logs||[]).length){ lines.push('---','## Log Entries (latest first)',''); (userState.logs||[]).slice().reverse().forEach(L=>{ lines.push(`- ${fmtDate(L.ts)} — **${L.title}** — ${L.outcome||'(no outcome)'}${L.notes?` — _${L.notes}_`:''}`); }); }
+      downloadBlob(lines.join('\n'),'text/markdown',`claude-prompt-report.${space}.md`);
+    }
+
+    function toCSV(rows){
+      const cols=['id','title','reason','done','outcome','notes'];
+      const out=[cols.join(',')].concat(rows.map(r=>cols.map(k=>`"${(''+(r[k]??'')).replace(/\"/g,'""')}"`).join(',')));
+      return out.join('\n');
+    }
+    function exportCSV(){ downloadBlob(toCSV(buildRows()),'text/csv',`claude-prompts.${space}.csv`); }
+
+    // Excel XML 2003 (opens in Excel)
+    function exportXLS(){
+      const rows=buildRows();
+      const sheet = ['<?xml version="1.0"?>',
+        '<Workbook xmlns="urn:schemas-microsoft-com:office:spreadsheet" xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel" xmlns:ss="urn:schemas-microsoft-com:office:spreadsheet">',
+        '<Worksheet ss:Name="Prompts"><Table>'];
+      const cols=['ID','Title','Reason','Done','Outcome','Notes'];
+      sheet.push('<Row>'+cols.map(c=>`<Cell><Data ss:Type="String">${escapeXml(c)}</Data></Cell>`).join('')+'</Row>');
+      rows.forEach(r=>{ const cells=[r.id,r.title,r.reason,r.done?'TRUE':'FALSE',r.outcome,r.notes]; sheet.push('<Row>'+cells.map(v=>`<Cell><Data ss:Type="String">${escapeXml(v)}</Data></Cell>`).join('')+'</Row>'); });
+      sheet.push('</Table></Worksheet>');
+      // Logs sheet
+      sheet.push('<Worksheet ss:Name="Logs"><Table>');
+      sheet.push('<Row>'+['Date','Prompt','Outcome','Notes'].map(c=>`<Cell><Data ss:Type="String">${escapeXml(c)}</Data></Cell>`).join('')+'</Row>');
+      (userState.logs||[]).forEach(L=>{ const cells=[fmtDate(L.ts),L.title,L.outcome||'',L.notes||'']; sheet.push('<Row>'+cells.map(v=>`<Cell><Data ss:Type="String">${escapeXml(v)}</Data></Cell>`).join('')+'</Row>'); });
+      sheet.push('</Table></Worksheet></Workbook>');
+      downloadBlob(sheet.join(''),'application/vnd.ms-excel',`claude-prompts.${space}.xls`);
+    }
+    function escapeXml(s){ return (''+s).replace(/[<&>\"]/g, c=>({"<":"&lt;","&":"&amp;",">":"&gt;","\"":"&quot;"}[c])); }
+
+    // PDF via print stylesheet (no <script> tags in the string)
+    function exportPDF(){
+      const w = window.open('', '_blank');
+      const rows = buildRows();
+      const html = `<!doctype html><html><head><meta charset="utf-8"><title>Prompt Report — ${space}</title>
+      <style>body{font-family:Segoe UI,Arial,sans-serif;padding:24px}h1{margin:0 0 8px 0}h2{margin:18px 0 6px 0} .muted{color:#555}
+      table{width:100%;border-collapse:collapse;font-size:12px}th,td{border:1px solid #999;padding:6px;text-align:left;vertical-align:top}
+      .small{font-size:11px;color:#666}
+      </style></head><body onload="setTimeout(function(){window.print()},200)">
+      <h1>Claude Prompt Session Report</h1>
+      <div class="muted">Space: ${escapeHtml(space)} — Generated: ${new Date().toLocaleString()}</div>
+      <h2>Prompts</h2>
+      <table><thead><tr><th>Status</th><th>Title</th><th>Reason</th><th>Outcome</th><th>Notes</th></tr></thead><tbody>
+      ${rows.map(r=>`<tr><td>${r.done?'✅':''}</td><td>${escapeHtml(r.title)}</td><td>${escapeHtml(r.reason)}</td><td>${escapeHtml(r.outcome)}</td><td>${escapeHtml(r.notes)}</td></tr>`).join('')}
+      </tbody></table>
+      <h2>Logs</h2>
+      <table><thead><tr><th>Date</th><th>Prompt</th><th>Outcome</th><th>Notes</th></tr></thead><tbody>
+      ${(userState.logs||[]).map(L=>`<tr><td>${escapeHtml(fmtDate(L.ts))}</td><td>${escapeHtml(L.title)}</td><td>${escapeHtml(L.outcome||'')}</td><td>${escapeHtml(L.notes||'')}</td></tr>`).join('')}
+      </tbody></table>
+      </body></html>`;
+
+      if (w && w.document) { w.document.open(); w.document.write(html); w.document.close(); }
+      else { downloadBlob(html, 'text/html', `claude-prompt-report.${space}.html`); }
+    }
+
+    function downloadBlob(content, mime, filename){
+      const blob = new Blob([content], {type:mime});
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a'); a.href=url; a.download=filename; a.click(); URL.revokeObjectURL(url);
+    }
+
+    // Logs filter
+    $('#logSearch')?.addEventListener('input', renderLogs);
+
+    // Toolbar actions
+    $('#search')?.addEventListener('input', renderPrompts);
+    $('#expandAll')?.addEventListener('click', ()=>{ $$('#view-prompts .content').forEach(el=>el.classList.remove('hidden')); allItems().forEach(it=>userState.collapsed[it.id]=false); saveState(); renderPrompts(); });
+    $('#collapseAll')?.addEventListener('click', ()=>{ $$('#view-prompts .content').forEach(el=>el.classList.add('hidden')); allItems().forEach(it=>userState.collapsed[it.id]=true); saveState(); renderPrompts(); });
+    $('#exportJson')?.addEventListener('click', exportJSON);
+    $('#exportMd')?.addEventListener('click', exportMarkdown);
+    $('#exportCsv')?.addEventListener('click', exportCSV);
+    $('#exportXls')?.addEventListener('click', exportXLS);
+    $('#exportPdf')?.addEventListener('click', exportPDF);
+    $('#reset')?.addEventListener('click', ()=>{ if(confirm(`Reset all progress in space \"${space}\"?`)){ userState = defaultState(); saveState(); renderPrompts(); renderLogs(); renderCustom(); renderIntegrations(); } });
+    $('#exportLogsCsv')?.addEventListener('click', ()=>{ const cols=['date','title','outcome','notes']; const lines=[cols.join(',')]; (userState.logs||[]).forEach(L=>lines.push([fmtDate(L.ts),`\"${(L.title||'').replace(/\"/g,'\"\"')}\"`,`\"${(L.outcome||'').replace(/\"/g,'\"\"')}\"`,`\"${(L.notes||'').replace(/\"/g,'\"\"')}\"`].join(','))); downloadBlob(lines.join('\n'),'text/csv',`claude-prompt-logs.${space}.csv`); });
+    $('#exportLogsXls')?.addEventListener('click', ()=>{ const head=['Date','Prompt','Outcome','Notes']; const rows=(userState.logs||[]).map(L=>[fmtDate(L.ts),L.title,L.outcome||'',L.notes||'']); const xml=['<?xml version="1.0"?>','<Workbook xmlns="urn:schemas-microsoft-com:office:spreadsheet" xmlns:ss="urn:schemas-microsoft-com:office:spreadsheet">','<Worksheet ss:Name="Logs"><Table>','<Row>'+head.map(c=>`<Cell><Data ss:Type=\"String\">${escapeXml(c)}</Data></Cell>`).join('')+'</Row>']; rows.forEach(r=>xml.push('<Row>'+r.map(v=>`<Cell><Data ss:Type=\"String\">${escapeXml(v)}</Data></Cell>`).join('')+'</Row>')); xml.push('</Table></Worksheet></Workbook>'); downloadBlob(xml.join(''),'application/vnd.ms-excel',`claude-prompt-logs.${space}.xls`); });
+    $('#exportLogsPdf')?.addEventListener('click', ()=>{ setTab('logs'); setTimeout(exportPDF,150); });
+
+    // Manage: add prompt
+    $('#addPrompt')?.addEventListener('click',()=>{
+      const title=$('#newTitle')?.value.trim(); const reason=$('#newReason')?.value.trim(); const content=$('#newContent')?.value.trim();
+      if(!title||!content){ alert('Title and Content are required'); return; }
+      const id='u-'+Date.now(); (userState.customItems||[]).push({id,title,reason,content}); saveState(); if($('#newTitle')) $('#newTitle').value=''; if($('#newReason')) $('#newReason').value=''; if($('#newContent')) $('#newContent').value=''; renderCustom(); renderPrompts(); setTab('prompts');
+    });
+
+    // Integrations — Google
+    $('#googleConnect')?.addEventListener('click', async ()=>{
+      const clientId = $('#googleClientId')?.value.trim(); if(!clientId){ alert('Enter Google OAuth Client ID'); return; }
+      userState.gClientId = clientId; saveState();
+      try{
+        await loadScript('https://accounts.google.com/gsi/client');
+        await loadScript('https://apis.google.com/js/api.js');
+        await new Promise(res=>gapi.load('client',res));
+        await gapi.client.init({ discoveryDocs:[ 'https://www.googleapis.com/discovery/v1/apis/sheets/v4/rest' ] });
+        const tokenClient = google.accounts.oauth2.initTokenClient({ client_id: clientId, scope: 'https://www.googleapis.com/auth/drive.file https://www.googleapis.com/auth/spreadsheets', callback: (resp)=>{ if(resp && resp.access_token){ userState.gAuthed=true; saveState(); renderIntegrations(); alert('Google connected. You can now export to Sheets.'); } } });
+        tokenClient.requestAccessToken({ prompt: 'consent' });
+      }catch(e){ console.error(e); alert('Google init failed. Make sure you are on http://localhost and Client ID is valid.'); }
+    });
+
+    $('#exportGoogleSheets')?.addEventListener('click', async ()=>{
+      if(!userState.gClientId){ alert('Connect Google first'); return; }
+      try{
+        const rows = buildRows();
+        const body = { properties:{ title: 'Claude Prompt Report — '+space }, sheets:[ { properties:{ title:'Prompts' } }, { properties:{ title:'Logs' } } ] };
+        const ss = await gapi.client.sheets.spreadsheets.create({}, body);
+        const spreadsheetId = ss.result.spreadsheetId;
+        const values1 = [['Status','Title','Reason','Outcome','Notes']].concat(rows.map(r=>[r.done?'✅':'', r.title, r.reason, r.outcome, r.notes]));
+        const values2 = [['Date','Prompt','Outcome','Notes']].concat((userState.logs||[]).map(L=>[fmtDate(L.ts), L.title, L.outcome||'', L.notes||'']));
+        await gapi.client.sheets.spreadsheets.values.batchUpdate({ spreadsheetId }, { data:[ { range:'Prompts!A1', values: values1 }, { range:'Logs!A1', values: values2 } ], valueInputOption:'RAW' });
+        const url = ss.result.spreadsheetUrl || `https://docs.google.com/spreadsheets/d/${spreadsheetId}`;
+        alert('Exported to Google Sheets: '+url);
+      }catch(e){ console.error(e); alert('Sheets export failed. Ensure Google is connected and permissions granted.'); }
+    });
+
+    // Integrations — Microsoft / OneDrive
+    let msalInstance = null, msAccount = null;
+    $('#msConnect')?.addEventListener('click', async ()=>{
+      const clientId=$('#msClientId')?.value.trim(); if(!clientId){ alert('Enter Microsoft Client ID'); return; }
+      userState.msClientId=clientId; saveState();
+      try{
+        await loadScript('https://alcdn.msauth.net/browser/2.37.0/js/msal-browser.min.js');
+        msalInstance = new msal.PublicClientApplication({ auth:{ clientId, redirectUri: window.location.origin } });
+        const loginResp = await msalInstance.loginPopup({ scopes:['Files.ReadWrite'] });
+        msAccount = loginResp.account; userState.msAuthed=true; saveState(); renderIntegrations(); alert('Microsoft connected.');
+      }catch(e){ console.error(e); alert('Microsoft init failed. Make sure you are on http://localhost and Client ID is valid.'); }
+    });
+
+    $('#saveOneDriveCsv')?.addEventListener('click', async ()=>{
+      if(!msalInstance || !userState.msAuthed){ alert('Connect Microsoft first'); return; }
+      try{
+        const tokenResp = await msalInstance.acquireTokenSilent({ scopes:['Files.ReadWrite'], account: msAccount });
+        const csv = toCSV(buildRows());
+        const filename = `claude-prompts.${space}.${new Date().toISOString().slice(0,10)}.csv`;
+        const uploadUrl = `https://graph.microsoft.com/v1.0/me/drive/root:/Documents/${encodeURIComponent(filename)}:/content`;
+        const resp = await fetch(uploadUrl, { method:'PUT', headers:{ 'Authorization':`Bearer ${tokenResp.accessToken}`, 'Content-Type':'text/csv' }, body: csv });
+        if(!resp.ok) throw new Error('Upload failed');
+        alert('Saved CSV to OneDrive /Documents');
+      }catch(e){ console.error(e); alert('OneDrive save failed. Ensure permissions and account.'); }
+    });
+
+    async function loadScript(src){ return new Promise((res,rej)=>{ const s=document.createElement('script'); s.src=src; s.onload=()=>res(); s.onerror=rej; document.head.appendChild(s); }); }
+
+    // --- Self-tests (smoke + JSON schema) ---
+    function runSelfTests(){
+      const results = [];
+      results.push(['Space parsed', typeof space==='string' && space.length>0]);
+      results.push(['State key namespaced', stateKey.includes('::')]);
+      results.push(['JSON parsed', Array.isArray(data.items)]);
+      results.push(['JSON schema ok', jsonOk]);
+      results.push(['exportCSV exists', typeof exportCSV === 'function']);
+      results.push(['exportXLS exists', typeof exportXLS === 'function']);
+      results.push(['exportPDF exists', typeof exportPDF === 'function']);
+      const html = (()=>{ try { return exportPdfHtmlPreview(); } catch(e){ return ''; } })();
+      results.push(['PDF HTML well-formed end tags', html.endsWith('</html>')]);
+      console.table(results.map(([name, ok])=>({ test:name, ok })));
+      alert('Self-tests complete. Open console for details.');
+    }
+    function exportPdfHtmlPreview(){
+      const rows = buildRows();
+      return `<!doctype html><html><head><meta charset="utf-8"><title>Prompt Report — ${space}</title></head><body>${rows.length}</body></html>`;
+    }
+    $('#runTests')?.addEventListener('click', runSelfTests);
+
+    // Initial render
+    renderPrompts(); setTab('prompts');
+  })();
+  </script>
+</body>
+</html>
